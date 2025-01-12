@@ -9,10 +9,10 @@ app.secret_key = os.urandom(24)  # 生成密鑰
 
 # 設定 Session 配置
 app.config.update(
-    SESSION_COOKIE_SECURE=True,    # 只在 HTTPS 傳送
-    SESSION_COOKIE_HTTPONLY=True,  # 防止 JavaScript 訪問
-    SESSION_COOKIE_SAMESITE='Lax', # 防止 CSRF
-    PERMANENT_SESSION_LIFETIME=timedelta(days=1)  # Session 過期時間
+    SESSION_COOKIE_SECURE=False,     # 改為 False
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=1)
 )
 
 csrf = CSRFProtect(app)
