@@ -1,15 +1,23 @@
-from config import MYSQL_CONFIG
 import mysql.connector
 from flask import Flask, render_template, request, redirect, session
-import os  # 生成密鑰
-from datetime import timedelta  # 加入這行
+import os
+from datetime import timedelta
 from flask_wtf.csrf import CSRFProtect
-app = Flask(__name__, static_folder='static')
-app.secret_key = os.urandom(24)  # 生成密鑰
 
-# 設定 Session 配置
+app = Flask(__name__, static_folder='static')
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
+
+# MySQL 配置從環境變數獲取
+MYSQL_CONFIG = {
+    'host': os.getenv('MYSQL_HOST'),
+    'user': os.getenv('MYSQL_USER'),
+    'password': os.getenv('MYSQL_PASSWORD'),
+    'database': os.getenv('MYSQL_DATABASE')
+}
+
+# Session 配置
 app.config.update(
-    SESSION_COOKIE_SECURE=False,     # 改為 False
+    SESSION_COOKIE_SECURE=False,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=timedelta(days=1)

@@ -11,9 +11,6 @@ venv/
 .vscode/
 .idea/
 
-# Config
-config.py
-
 # Database
 *.db
 *.sqlite3 
