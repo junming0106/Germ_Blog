@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block title %}某個頁面{% endblock %}
+
+{% block extra_css %}
+<!-- 這個頁面特定的 CSS -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/some_page.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- 頁面內容 -->
+{% endblock %}
+
+{% block extra_js %}
+<!-- 這個頁面特定的 JavaScript -->
+<script src="{{ url_for('static', filename='js/some_page.js') }}"></script>
+{% endblock %} 

@@ -1,0 +1,51 @@
+{% extends "layout.html"%}
+{% block title %}首頁{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-300">最新文章</h1>
+
+    {% if posts %}
+        {% for post in posts %}
+        <!-- 文章卡片 -->
+        <article class="bg-white rounded-lg shadow p-6 space-y-4">
+            <!-- 文章標題 -->
+            <h2 class="text-xl font-semibold text-gray-800">
+                <a href="/post/{{ post.id }}" class="hover:text-blue-600">
+                    {{ post.title }}
+                </a>
+            </h2>
+            
+            <!-- 文章資訊 -->
+            <div class="flex items-center text-sm text-gray-500 space-x-4">
+                <span>作者：{{ post.username }}</span>
+                <span>發布於：{{ post.create_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            
+            <!-- 文章預覽 -->
+            <p class="text-gray-600">
+                {{ post.content[:200] }}...
+            </p>
+            
+            <!-- 閱讀更多按鈕 -->
+            <div class="pt-4">
+                <a href="/post/{{ post.id }}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600">
+                    閱讀更多
+                </a>
+            </div>
+        </article>
+        {% endfor %}
+    {% else %}
+        <p class="text-gray-600 text-center py-8">
+            目前還沒有任何文章。
+            {% if session.get('user_id') %}
+                <a href="/post" class="text-blue-500 hover:underline">立即發布第一篇文章</a>
+            {% else %}
+                <a href="/login" class="text-blue-500 hover:underline">登入</a>
+                發布第一篇文章
+            {% endif %}
+        </p>
+    {% endif %}
+</div>
+{% endblock %}
