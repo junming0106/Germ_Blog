@@ -179,6 +179,6 @@ def view_post(post_id):
     finally:
         cursor.close()
         conn.close()
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# 本機端測試
+# if __name__ == '__main__':
+#     app.run(debug=True)

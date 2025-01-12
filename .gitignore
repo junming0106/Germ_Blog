@@ -45,4 +45,7 @@ config.py
 node_modules/
 
 # Logs
-*.log 
+*.log
+
+# Environment
+.env 
