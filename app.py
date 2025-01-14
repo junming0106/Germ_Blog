@@ -1,10 +1,12 @@
 import mysql.connector
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, flash, render_template, request, redirect, session, jsonify
 import os
 from datetime import timedelta
 from flask_wtf.csrf import CSRFProtect
+import markdown
 
 app = Flask(__name__, static_folder='static')
+#  os.urandom(n) 隨機生成n個字元的字串
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 
 # MySQL 配置從環境變數獲取
@@ -30,13 +32,11 @@ def index():
     conn = mysql.connector.connect(**MYSQL_CONFIG)
     cursor = conn.cursor(dictionary=True)
     try:
-        # 獲取所有有標題和內容的文章
         cursor.execute('''
-            SELECT id, username, title, content, create_at 
-            FROM blog 
-            WHERE title IS NOT NULL 
-            AND content IS NOT NULL 
-            ORDER BY create_at DESC
+            SELECT p.id, u.username, p.title, p.content, p.create_at 
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.create_at DESC
         ''')
         posts = cursor.fetchall()
         return render_template('index.html', posts=posts)
@@ -47,99 +47,16 @@ def index():
         cursor.close()
         conn.close()
 
-# 登入
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        # 基本驗證
-        if not username or not password:
-            return '請填寫所有欄位'
-            
-        conn = mysql.connector.connect(**MYSQL_CONFIG)
-        cursor = conn.cursor(dictionary=True)
-        try:
-            cursor.execute('SELECT * FROM blog WHERE username = %s AND password = %s', 
-                         (username, password))
-            user = cursor.fetchone()
-            
-            if user:
-                # 可以加入 session 處理
-                session['user_id'] = user['id']
-                return redirect('/')
-            else:
-                return '帳號或密碼錯誤'
-                
-        except mysql.connector.Error as err:
-            print(f"資料庫錯誤：{err}")
-            return '登入時發生錯誤'
-        finally:
-            cursor.close()
-            conn.close()
-    
-    return render_template('login.html')
-
-# 登出
-@app.route('/logout')
-def logout():
-    # 清除session 就可以登出
-    session.clear()
-    # 導向首頁
-    return redirect('/')
-
-# 註冊頁面，載入時是GET，提交時是POST
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        email = request.form.get('email')
-        
-        conn = mysql.connector.connect(**MYSQL_CONFIG)
-        cursor = conn.cursor(buffered=True) # 加入buffered=True，可以確保資料完整存入到記憶體中，變免未讀錯誤
-        try:
-            if username and password and email:
-                if len(password) >= 8:
-                    if password == confirm_password:
-                        cursor.execute('''
-                            INSERT INTO blog(username, password, email) 
-                            VALUES(%s, %s, %s)
-                        ''', (username, password, email))
-                        conn.commit()
-                    else:
-                        return '密碼不一致'
-                else:
-                    return '密碼長度至少8個字'
-            else:
-                return redirect('/register')
-        except mysql.connector.Error as err:
-            conn.rollback()
-            print(f"錯誤：{err}")
-            if err.errno == 1062:  # 重複的用戶名
-                return '用戶名已存在'
-            return '註冊失敗'
-        finally:
-            cursor.close()
-            conn.close()
-        return redirect('/')
-    
-    # GET 請求時顯示註冊頁面
-    return render_template('register.html')
-
 @app.route('/post', methods=['GET', 'POST'])
 def new_post():
-    # 判斷使用者是否登入
     if not session.get('user_id'):
         return redirect('/login')
         
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
+        user_id = session.get('user_id')
         
-        # 基本驗證
         if not title or not content:
             return '標題和內容不能為空'
             
@@ -147,12 +64,13 @@ def new_post():
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                UPDATE blog 
-                SET title = %s, content = %s 
-                WHERE id = %s
-            ''', (title, content, session['user_id']))
+                INSERT INTO posts (user_id, title, content) 
+                VALUES (%s, %s, %s)
+            ''', (user_id, title, content))
+            
             conn.commit()
             return redirect('/')
+            
         except mysql.connector.Error as err:
             conn.rollback()
             print(f"錯誤：{err}")
@@ -168,15 +86,15 @@ def view_post(post_id):
     conn = mysql.connector.connect(**MYSQL_CONFIG)
     cursor = conn.cursor(dictionary=True)
     try:
-        # 獲取特定文章的詳細資訊
         cursor.execute('''
-            SELECT id, username, title, content, create_at 
-            FROM blog 
-            WHERE id = %s
+            SELECT p.id, p.user_id, u.username, p.title, p.content, p.create_at 
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.id = %s
         ''', (post_id,))
         post = cursor.fetchone()
-        
         if post:
+            post['content'] = markdown.markdown(post['content'])
             return render_template('view_post.html', post=post)
         else:
             return '文章不存在'
@@ -187,6 +105,126 @@ def view_post(post_id):
     finally:
         cursor.close()
         conn.close()
-# 本機端測試
-# if __name__ == '__main__':
-#     app.run(debug=True)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        email = request.form.get('email')
+        
+        if not all([username, password, email]):
+            return render_template('register.html', 
+                error='missing_fields',
+                message='請填寫所有欄位')
+            
+        if len(password) < 8:
+            return render_template('register.html', 
+                error='password_length',
+                message='密碼長度至少需要8個字元')
+            
+        if password != confirm_password:
+            return render_template('register.html', 
+                error='password_mismatch',
+                message='密碼不一致')
+
+        try:
+            conn = mysql.connector.connect(**MYSQL_CONFIG)
+            cursor = conn.cursor(buffered=True)
+            
+            cursor.execute('''
+                INSERT INTO users (username, password, email) 
+                VALUES(%s, %s, %s)
+            ''', (username, password, email))
+            
+            conn.commit()
+            session['user_id'] = cursor.lastrowid
+            return redirect('/')
+            
+        except mysql.connector.Error as err:
+            if err.errno == 1062:
+                return render_template('register.html', 
+                    error='username_exists',
+                    message='用戶名已存在')
+            else:
+                return render_template('register.html', 
+                    error='database_error',
+                    message='註冊失敗')
+            
+        finally:
+            cursor.close()
+            conn.close()
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if not username or not password:
+            return render_template('login.html', 
+                error='missing_fields', 
+                message='請填寫所有欄位')
+        
+        try:
+            conn = mysql.connector.connect(**MYSQL_CONFIG)
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute('SELECT * FROM users WHERE username = %s AND password = %s',
+                           (username, password))
+            user = cursor.fetchone()
+            
+            if user:
+                session['user_id'] = user['id']
+                return redirect('/')
+            else:
+                return render_template('login.html', 
+                    error='invalid_credentials', 
+                    message='帳號或密碼錯誤')
+                    
+        except mysql.connector.Error as err:
+            print(f"資料庫錯誤：{err}")
+            return render_template('login.html', 
+                error='database_error', 
+                message='登入時發生錯誤')
+        finally:
+            cursor.close()
+            conn.close()
+
+    return render_template('login.html')
+
+#登出
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+# 刪除文章
+@app.route('/post/delete/<int:post_id>', methods=['POST'])
+def delete_post(post_id):
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 檢查是否為文章作者
+        cursor.execute('SELECT user_id FROM posts WHERE id = %s', (post_id,))
+        post = cursor.fetchone()
+    
+        # 刪除文章
+        cursor.execute('DELETE FROM posts WHERE id = %s', (post_id,))
+        conn.commit()
+        
+        return jsonify({'message': 'Success'}), 200
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

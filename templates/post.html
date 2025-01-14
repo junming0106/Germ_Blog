@@ -7,8 +7,8 @@
     <h2 class="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-gray-300">新增文章</h2>
 
     <form action="/post" method="POST" class="space-y-4">
-        <!-- 隱藏CSRF字串 加入 CSRF 保護 -->
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
         <!-- 標題 -->
         <div>
             <label for="title" class="block text-sm font-medium dark:text-gray-300 mb-1">
@@ -24,19 +24,30 @@
             >
         </div>
 
-        <!-- 內容 -->
+        <!-- 內容區塊 -->
         <div>
             <label for="content" class="block text-sm font-medium dark:text-gray-300 mb-1">
-                內容
+                內容（支援 Markdown）
+                <span class="md:hidden text-sm text-gray-500">（向下滑動可預覽）</span>
             </label>
-            <textarea 
-                id="content" 
-                name="content" 
-                required 
-                rows="10"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="請輸入文章內容"
-            ></textarea>
+            <!-- 左右分欄 -->
+            <div class="grid md:grid-cols-2 gap-4">
+                <!-- 左側編輯區 -->
+                <div>
+                    <textarea 
+                        id="content" 
+                        name="content" 
+                        required 
+                        rows="12"
+                        class="w-full px-3 py-2 border h-[300px] md:h-[375px] border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        placeholder="請輸入文章內容（支援 Markdown 語法）"
+                    ></textarea>
+                </div>
+                <!-- 右側預覽區 -->
+                <div 
+                    id="preview" 
+                    class="prose prose-lg dark:prose-invert w-full h-[300px] md:h-[375px] px-3 py-2 border border-gray-300 rounded-md overflow-y-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                ></div>
         </div>
 
         <!-- 發布按鈕 -->
@@ -50,4 +61,38 @@
         </div>
     </form>
 </div>
+
+<!-- 引入 marked.js -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const content = document.querySelector('#content');
+        const preview = document.querySelector('#preview');
+        // 設置 marked 選項
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // 更新預覽
+        function updatePreview() {
+            const markdown = content.value;
+            const html = marked.parse(markdown);
+            if (html) {
+                preview.innerHTML = html;
+            } else {
+                preview.innerHTML = "Markdown 語法錯誤，無法預覽...";
+                preview.classList.add('text-gray-500');
+                
+            }
+        }
+
+        // 監聽輸入事件，即時更新預覽內容
+        content.addEventListener('input', updatePreview);
+        
+        // 初始更新
+        updatePreview();
+    });
+</script>
 {% endblock %}
+

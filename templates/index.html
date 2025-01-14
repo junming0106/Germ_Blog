@@ -39,6 +39,7 @@
     {% else %}
         <p class="text-gray-600 text-center py-8">
             目前還沒有任何文章。
+            <!-- 判斷是否登入 -->
             {% if session.get('user_id') %}
                 <a href="/post" class="text-blue-500 hover:underline">立即發布第一篇文章</a>
             {% else %}
