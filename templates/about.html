@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About</title>
+</head>
+<body>
+    <h1 id="title">About</h1>
+    <button id="btn" onclick="getData()">Click me</button>
+</body>
+</html>
+
+<script>
+    async function getData(){
+        try{
+            const res = await fetch('http://127.0.0.1:5000/about')
+            const data = await res.json()
+            console.log(data)
+            document.querySelector('#title').textContent = data.message
+        }catch(e){
+            console.log(e)
+        }
+    }
+</script>

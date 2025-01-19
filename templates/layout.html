@@ -59,7 +59,9 @@
                     {% if session.get('user_id') %}
                         <a href="/" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">主頁</a>
                         <a href="/post" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">發文</a>
+                        <a href="/photo" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">精選相簿</a>
                         <a href="/logout" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">登出</a>
+                        
                     {% else %}
                         <a href="/login" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">登入</a>
                         <a href="/register" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg ">註冊</a>

@@ -1,9 +1,10 @@
 import mysql.connector
-from flask import Flask, flash, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, session, jsonify
 import os
 from datetime import timedelta
 from flask_wtf.csrf import CSRFProtect
 import markdown
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='static')
 #  os.urandom(n) 隨機生成n個字元的字串
@@ -226,5 +227,149 @@ def delete_post(post_id):
         cursor.close()
         conn.close()
 
+
+# 編輯文章
+@app.route('/post/edit/<int:post_id>', methods=['GET', 'POST'])
+def edit_post(post_id):
+    if not session.get('user_id'):
+        return redirect('/login')
+        
+    conn = mysql.connector.connect(**MYSQL_CONFIG)
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # 先取得文章資料
+        cursor.execute('SELECT * FROM posts WHERE id = %s', (post_id,))
+        post = cursor.fetchone()
+        
+        if not post:
+            return '找不到該文章'
+    
+        if request.method == 'POST':
+            title = request.form.get('title')
+            content = request.form.get('content')
+            
+            if not title or not content:
+                return '標題和內容不能為空'
+            
+            cursor.execute('UPDATE posts SET title = %s, content = %s WHERE id = %s', 
+                         (title, content, post_id))
+            conn.commit()
+            return redirect('/post/' + str(post_id))
+        
+        return render_template('edit_post.html', post=post)
+        
+    except mysql.connector.Error as err:
+        conn.rollback()
+        print(f"資料庫錯誤：{err}")
+        return '編輯文章失敗'
+        
+    finally:
+        cursor.close()
+        conn.close()
+        
+    return render_template('edit_post.html')    
+
+
+# API 測試
+@app.route('/about-btn', methods=['GET'])
+def about_btn():
+    return render_template('about.html')
+
+# 上傳圖片資料夾
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+# 判斷上傳的圖片格式
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+@app.route('/photo', methods=['GET', 'POST'])
+def photo():
+    try:
+        # 從資料庫取得照片
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)  # 使用 dictionary=True 讓結果以字典形式返回
+        cursor.execute('SELECT * FROM photos ORDER BY created_at DESC')
+        photos = cursor.fetchall()
+        
+        return render_template('photo.html', photos=photos)
+        
+    except mysql.connector.Error as err:
+        print(f"資料庫錯誤：{err}")
+        return '讀取照片失敗'
+        
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# 上傳圖片版面
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'GET':
+        return render_template('upload.html')
+
+# 上傳圖片路由
+@app.route('/upload_image', methods=['POST'])
+def upload_file():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return '沒有選擇檔案'
+            
+        image = request.files['file']
+        if image.filename == '':
+            return '沒有選擇檔案'
+            
+        if image and allowed_file(image.filename):
+            try:
+                # 儲存圖片
+                filename = secure_filename(image.filename)
+                image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                
+                # 圖片 URL
+                photo_url = f'uploads/{filename}'  # 修改 URL 格式
+                
+                # 儲存到資料庫
+                conn = mysql.connector.connect(**MYSQL_CONFIG)
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT INTO photos (filename, url, user_id) 
+                    VALUES (%s, %s, %s)
+                ''', (filename, photo_url, session.get('user_id')))
+                
+                conn.commit()
+                return redirect('/photo')
+                
+            except Exception as e:
+                print(f"Error: {e}")
+                return '上傳失敗'
+                
+            finally:
+                cursor.close()
+                conn.close()
+        else:
+            return '不支援的檔案格式'
+
+    
+
+
+@app.route('/about', methods=['GET','POST'])
+def about():
+    conn = mysql.connector.connect(**MYSQL_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute('SELECT username FROM users')
+    users = cursor.fetchall()
+    print(users)
+    if request.method == 'POST':
+        return jsonify({"message": users})
+    elif request.method == 'GET':
+        return jsonify({"message": users})
+    else:
+        return jsonify({"message": "Hello, World!"})
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
