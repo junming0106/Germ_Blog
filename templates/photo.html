@@ -5,25 +5,81 @@
 {% endblock %}
 
 {% block content %}
-
-    <div class="grid grid-cols-1 gap-4 max-w-2xl mx-auto">
-        <h1 class="text-4xl text-gray-800 font-bold mb-6 text-center dark:text-white ">我的精選相簿</h1>
-        <button type="button" class="w-1/2 mx-auto bg-orange-500 text-white py-2 rounded-md">
-            <a href="/upload">新增照片</a>
-        </button>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto px-4">
+        <h1 class="text-4xl text-gray-800 font-bold mb-8 text-center dark:text-white col-span-full"><span class="text-orange-500">我的</span>精選相簿 </h1>
+        <div class="col-span-full flex justify-center mb-8 fixed bottom-0 left-0 right-0 z-10 translate-y-3 hover:translate-y-0 transition-all duration-300">
+            <a href="/upload" class="w-48">
+                <button type="button" class="w-full bg-orange-500 border-2 border-orange-500 text-white py-2 rounded-md hover:bg-orange-600 hover:border-orange-600 hover:opacity-100 transition duration-300">
+                    新增照片
+                </button>
+            </a>
+        </div>
         {% if photos|length > 0 %}
             {% for photo in photos %}
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-6xl mx-auto">
-                    <img src="{{ url_for('static', filename=photo.url) }}" 
-                         alt="{{ photo.filename }}" 
-                         class="w-full h-auto">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg w-full transform transition-all duration-500 hover:scale-105 opacity-0 translate-y-8 photo-card group relative">
+                    <button onclick="deletePhoto({{ photo.id }})" 
+                            class="absolute top-2 right-2 p-2 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-red-600 z-10">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                    <div class="border-2 border-orange-500 aspect-w-16 aspect-h-9 overflow-hidden rounded-md relative pt-[56.25%] ">
+                        <img src="{{ url_for('static', filename=photo.url) }}" 
+                             alt="{{ photo.filename }}" 
+                             class="absolute inset-0 w-full h-full object-contain transition-transform duration-300 group-hover:scale-110">
+                    </div>
                 </div>
             {% endfor %}
         {% else %}
-            <h3 class="text-2ml text-white font-bold mb-6 text-center">目前沒有任何精選圖片</h3>
-            <button type="button" class="w-1/2 mx-auto bg-orange-500 text-white py-2 rounded-md">
-                <a href="/upload">開始新增照片</a>
-            </button>
+            <div class="col-span-full text-center">
+                <h3 class="text-2xl text-gray-800 dark:text-gray-300 font-bold mb-6">目前沒有任何精選圖片</h3>
+            </div>
         {% endif %}
     </div>
+
+    <script>
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.remove('opacity-0', 'translate-y-8');
+                        entry.target.classList.add('opacity-100', 'translate-y-0');
+                    }, index * 200);
+                }
+            });
+        }, {
+            threshold: 0.85,
+            rootMargin: '50px'
+        });
+
+        document.querySelectorAll('.photo-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        function deletePhoto(photoId) {
+            if (confirm('確定要刪除這張照片嗎？')) {
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                
+                fetch(`/photo/delete/${photoId}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': token,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('刪除失敗');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('刪除時發生錯誤');
+                });
+            }
+        }
+    </script>
 {% endblock %}

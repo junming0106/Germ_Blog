@@ -286,22 +286,36 @@ def allowed_file(filename):
 
 @app.route('/photo', methods=['GET', 'POST'])
 def photo():
+    if not session.get('user_id'):
+        return redirect('/login')
+        
     try:
         # 從資料庫取得照片
         conn = mysql.connector.connect(**MYSQL_CONFIG)
-        cursor = conn.cursor(dictionary=True)  # 使用 dictionary=True 讓結果以字典形式返回
-        cursor.execute('SELECT * FROM photos ORDER BY created_at DESC')
+        cursor = conn.cursor(dictionary=True)
+        
+        # 查詢當前用戶的照片
+        cursor.execute('''
+            SELECT * FROM photos 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC
+        ''', (session.get('user_id'),))
+        
         photos = cursor.fetchall()
         
+        # 不管是否有照片都返回模板
         return render_template('photo.html', photos=photos)
         
     except mysql.connector.Error as err:
         print(f"資料庫錯誤：{err}")
-        return '讀取照片失敗'
+        # 發生錯誤時也返回模板，但照片列表為空
+        return render_template('photo.html', photos=[])
         
     finally:
-        cursor.close()
-        conn.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
 
 
 # 上傳圖片版面
@@ -369,7 +383,46 @@ def about():
     else:
         return jsonify({"message": "Hello, World!"})
 
+@app.route('/photo/delete/<int:photo_id>', methods=['POST'])
+def delete_photo(photo_id):
+    if not session.get('user_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 檢查是否為照片擁有者
+        cursor.execute('SELECT * FROM photos WHERE id = %s AND user_id = %s', 
+                      (photo_id, session.get('user_id')))
+        photo = cursor.fetchone()
+        
+        if not photo:
+            return jsonify({'error': 'Unauthorized'}), 403
+            
+        # 刪除實際檔案
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], photo['filename'])
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+        # 從資料庫刪除記錄
+        cursor.execute('DELETE FROM photos WHERE id = %s', (photo_id,))
+        conn.commit()
+        
+        return jsonify({'message': 'Success'}), 200
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+        
+    finally:
+        cursor.close()
+        conn.close()
 
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
